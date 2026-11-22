@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>BauerBrindes | Experiência Mágica</title>
+
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
+    /* IMPORTANTE: fundo transparente no body para o vídeo da câmera aparecer por trás do canvas 3D */
+    body, html { width: 100%; height: 100%; overflow: hidden; background: transparent; color: #f8fafc; }
+
+    #tela-inicio {
+      position: fixed; inset: 0; z-index: 9999;
+      background: radial-gradient(circle at top, #1e293b 0%, #090d16 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px; text-align: center;
+    }
+    .logo-badge {
+      background: linear-gradient(135deg, #f59e0b, #ea580c);
+      color: #fff; font-weight: 800; letter-spacing: 1.5px;
+      padding: 8px 18px; border-radius: 999px; font-size: 0.85rem;
+      text-transform: uppercase; margin-bottom: 18px;
+      box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
+    }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 12px; color: #fff; }
+    p.sub { font-size: 0.98rem; color: #94a3b8; max-width: 340px; line-height: 1.5; margin-bottom: 28px; }
+
+    #btn-iniciar {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #090d16; font-weight: 800; font-size: 1.05rem;
+      border: none; border-radius: 14px; padding: 16px 32px;
+      cursor: pointer; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+    }
+    #btn-iniciar:disabled { opacity: 0.5; cursor: not-allowed; }
+    #status-carregamento { margin-top: 16px; font-size: 0.85rem; color: #38bdf8; }
+
+    #hud-camera {
+      position: fixed; inset: 0; z-index: 100; pointer-events: none;
+      display: none; flex-direction: column; justify-content: space-between; padding: 20px;
+    }
+    .hud-topo {
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(8px);
+      padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+    }
+    .hud-marca { font-weight: 700; font-size: 0.9rem; color: #fbbf24; }
+    .hud-status { font-size: 0.8rem; color: #e2e8f0; }
+
+    .mira-centro {
+      width: 240px; height: 240px; margin: auto;
+      border: 2px dashed rgba(251, 191, 36, 0.65); border-radius: 20px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+      transition: opacity 0.3s ease;
+    }
+    .hud-rodape {
+      text-align: center; background: rgba(15, 23, 42, 0.78);
+      padding: 12px 16px; border-radius: 12px; font-size: 0.88rem; color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="tela-inicio">
+    <div class="logo-badge">BauerBrindes</div>
+    <h1>Dê vida à sua lembrança</h1>
+    <p class="sub">Toque no botão abaixo para ativar a câmera e aponte para a foto estampada no seu produto.</p>
+    <button id="btn-iniciar" disabled>Carregando...</button>
+    <div id="status-carregamento">Conectando ao catálogo mágico...</div>
+  </div>
+
+  <div id="hud-camera">
+    <div class="hud-topo">
+      <span class="hud-marca">BauerBrindes AR</span>
+      <span class="hud-status" id="texto-status-hud">Procurando foto...</span>
+    </div>
+    <div class="mira-centro" id="mira-guia"></div>
+    <div class="hud-rodape" id="dica-rodape">Enquadre a imagem do produto no centro da tela</div>
+  </div>
+
+  <div id="container-ar" style="width: 100%; height: 100%;"></div>
+
+  <script>
+    // COLE AQUI A SUA URL DO APPS SCRIPT (terminada em /exec)
+    const URL_API_SHEETS = 'COLE_AQUI_SUA_URL_DO_APPS_SCRIPT_EXEC';
+    const URL_TARGETS_MIND = 'https://filhoadao.github.io/BauerBrindes_midias/targets.mind';
+
+    let listaAlvos = [];
+    const contadosNaSessao = new Set();
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const btn = document.getElementById('btn-iniciar');
+      const status = document.getElementById('status-carregamento');
+
+      try {
+        const resp = await fetch(`${https://script.google.com/macros/s/AKfycbwxt52dx4ObKzXUcxb8Lug0DnuaybRlUv0PELth7Kmj7zlPJbdoNAqcJlk3Myj-UazTVw/exec}?acao=listar`);
+        listaAlvos = await resp.json();
+
+        if (!listaAlvos || listaAlvos.length === 0) {
+          status.textContent = 'Nenhum produto ativo encontrado na planilha.';
+          status.style.color = '#f87171';
+          return;
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Ativar Câmera Mágica';
+        status.textContent = `${listaAlvos.length} experiência(s) pronta(s)`;
+      } catch (err) {
+        status.textContent = 'Erro ao conectar na planilha: ' + err.message;
+        status.style.color = '#f87171';
+      }
+    });
+
+    document.getElementById('btn-iniciar').addEventListener('click', () => {
+      document.getElementById('tela-inicio').style.display = 'none';
+      document.getElementById('hud-camera').style.display = 'flex';
+      montarCenaAR();
+    });
+
+    function montarCenaAR() {
+      const container = document.getElementById('container-ar');
+      let assetsHTML = '';
+      let targetsHTML = '';
+
+      listaAlvos.forEach((alvo) => {
+        const vidId = `vid-alvo-${alvo.id}`;
+        assetsHTML += `
+          <video id="${vidId}" src="${alvo.urlVideo}"
+                 preload="auto" loop="true" crossorigin="anonymous"
+                 playsinline webkit-playsinline></video>
+        `;
+
+        targetsHTML += `
+          <a-entity id="target-entity-${alvo.id}" mindar-image-target="targetIndex: ${alvo.id}">
+            <a-video src="#${vidId}" position="0 0 0" height="1" width="1" rotation="0 0 0"></a-video>
+          </a-entity>
+        `;
+      });
+
+      container.innerHTML = `
+        <a-scene
+          mindar-image="imageTargetSrc: ${URL_TARGETS_MIND}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;"
+          color-space="sRGB"
+          renderer="colorManagement: true, physicallyCorrectLights"
+          vr-mode-ui="enabled: false"
+          device-orientation-permission-ui="enabled: false">
+
+          <a-assets>${assetsHTML}</a-assets>
+          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+          ${targetsHTML}
+        </a-scene>
+      `;
+
+      listaAlvos.forEach((alvo) => {
+        const entityEl = document.getElementById(`target-entity-${alvo.id}`);
+        const videoEl = document.getElementById(`vid-alvo-${alvo.id}`);
+
+        entityEl.addEventListener('targetFound', () => {
+          document.getElementById('mira-guia').style.opacity = '0';
+          document.getElementById('texto-status-hud').textContent = 'Imagem reconhecida!';
+          document.getElementById('dica-rodape').textContent = alvo.cliente ? `Memória de: ${alvo.cliente}` : 'Reproduzindo vídeo...';
+
+          videoEl.muted = false;
+          videoEl.play().catch(() => {
+            videoEl.muted = true;
+            videoEl.play();
+          });
+
+          if (!contadosNaSessao.has(alvo.id)) {
+            contadosNaSessao.add(alvo.id);
+            fetch(`${URL_API_SHEETS}?acao=registrar&id=${alvo.id}`).catch(() => {});
+          }
+        });
+
+        entityEl.addEventListener('targetLost', () => {
+          document.getElementById('mira-guia').style.opacity = '1';
+          document.getElementById('texto-status-hud').textContent = 'Procurando foto...';
+          document.getElementById('dica-rodape').textContent = 'Aponte novamente para a imagem do produto';
+          videoEl.pause();
+        });
+      });
+    }
+  </script>
+</body>
+</html>
