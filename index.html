@@ -10,7 +10,6 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
-    /* IMPORTANTE: fundo transparente no body para o vídeo da câmera aparecer por trás do canvas 3D */
     body, html { width: 100%; height: 100%; overflow: hidden; background: transparent; color: #f8fafc; }
 
     #tela-inicio {
@@ -84,8 +83,7 @@
   <div id="container-ar" style="width: 100%; height: 100%;"></div>
 
   <script>
-    // COLE AQUI A SUA URL DO APPS SCRIPT (terminada em /exec)
-    const URL_API_SHEETS = 'COLE_AQUI_SUA_URL_DO_APPS_SCRIPT_EXEC';
+    const URL_API_SHEETS = 'https://script.google.com/macros/s/AKfycbwxt52dx4ObKzXUcxb8Lug0DnuaybRlUv0PELth7Kmj7zlPjbdoNAqcJlk3Myj-UazTVw/exec';
     const URL_TARGETS_MIND = 'https://filhoadao.github.io/BauerBrindes_midias/targets.mind';
 
     let listaAlvos = [];
@@ -96,7 +94,7 @@
       const status = document.getElementById('status-carregamento');
 
       try {
-        const resp = await fetch(`${https://script.google.com/macros/s/AKfycbwxt52dx4ObKzXUcxb8Lug0DnuaybRlUv0PELth7Kmj7zlPJbdoNAqcJlk3Myj-UazTVw/exec}?acao=listar`);
+        const resp = await fetch(`${URL_API_SHEETS}?acao=listar`);
         listaAlvos = await resp.json();
 
         if (!listaAlvos || listaAlvos.length === 0) {
