@@ -33,8 +33,10 @@
       color: #090d16; font-weight: 800; font-size: 1.05rem;
       border: none; border-radius: 14px; padding: 16px 32px;
       cursor: pointer; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+      transition: transform 0.15s ease;
     }
     #btn-iniciar:disabled { opacity: 0.5; cursor: not-allowed; }
+    #btn-iniciar:active { transform: scale(0.97); }
     #status-carregamento { margin-top: 16px; font-size: 0.85rem; color: #38bdf8; }
 
     #hud-camera {
@@ -45,9 +47,17 @@
       display: flex; justify-content: space-between; align-items: center;
       background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(8px);
       padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+      pointer-events: auto;
     }
     .hud-marca { font-weight: 700; font-size: 0.9rem; color: #fbbf24; }
+    .hud-direita { display: flex; align-items: center; gap: 10px; }
     .hud-status { font-size: 0.8rem; color: #e2e8f0; }
+
+    #btn-som {
+      background: rgba(251, 191, 36, 0.2); border: 1px solid rgba(251, 191, 36, 0.5);
+      color: #fbbf24; border-radius: 8px; padding: 5px 10px; font-size: 0.78rem;
+      font-weight: 700; cursor: pointer; display: none;
+    }
 
     .mira-centro {
       width: 240px; height: 240px; margin: auto;
@@ -74,7 +84,10 @@
   <div id="hud-camera">
     <div class="hud-topo">
       <span class="hud-marca">BauerBrindes AR</span>
-      <span class="hud-status" id="texto-status-hud">Procurando foto...</span>
+      <div class="hud-direita">
+        <span class="hud-status" id="texto-status-hud">Procurando foto...</span>
+        <button id="btn-som" type="button">🔊 Som</button>
+      </div>
     </div>
     <div class="mira-centro" id="mira-guia"></div>
     <div class="hud-rodape" id="dica-rodape">Enquadre a imagem do produto no centro da tela</div>
@@ -88,6 +101,7 @@
     const URL_API_CONTADOR = 'https://script.google.com/macros/s/AKfycbwxt52dx4ObKzXUcxb8Lug0DnuaybRlUv0PELth7Kmj7zlPjbdoNAqcJlk3Myj-UazTVw/exec';
 
     let listaAlvos = [];
+    let videoAtivoAtual = null;
     const contadosNaSessao = new Set();
 
     window.addEventListener('DOMContentLoaded', async () => {
@@ -120,6 +134,20 @@
       montarCenaAR();
     });
 
+    document.getElementById('btn-som').addEventListener('click', () => {
+      if (!videoAtivoAtual) return;
+      videoAtivoAtual.muted = !videoAtivoAtual.muted;
+      document.getElementById('btn-som').textContent = videoAtivoAtual.muted ? '🔇 Mudo' : '🔊 Som';
+    });
+
+    function ajustarProporcaoVideo(videoEl, planeVideoEl) {
+      if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+        const proporcao = videoEl.videoHeight / videoEl.videoWidth;
+        planeVideoEl.setAttribute('width', '1');
+        planeVideoEl.setAttribute('height', proporcao.toFixed(4));
+      }
+    }
+
     function montarCenaAR() {
       const container = document.getElementById('container-ar');
       let assetsHTML = '';
@@ -127,6 +155,8 @@
 
       listaAlvos.forEach((alvo) => {
         const vidId = `vid-alvo-${alvo.id}`;
+        const planeId = `plane-alvo-${alvo.id}`;
+
         assetsHTML += `
           <video id="${vidId}" src="${alvo.urlVideo}"
                  preload="auto" loop="true" crossorigin="anonymous"
@@ -135,14 +165,14 @@
 
         targetsHTML += `
           <a-entity id="target-entity-${alvo.id}" mindar-image-target="targetIndex: ${alvo.id}">
-            <a-video src="#${vidId}" position="0 0 0" height="1" width="1" rotation="0 0 0"></a-video>
+            <a-video id="${planeId}" src="#${vidId}" position="0 0 0" width="1" height="1" rotation="0 0 0"></a-video>
           </a-entity>
         `;
       });
 
       container.innerHTML = `
         <a-scene
-          mindar-image="imageTargetSrc: ${URL_TARGETS_MIND}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;"
+          mindar-image="imageTargetSrc: ${URL_TARGETS_MIND}?t=${Date.now()}; autoStart: true; uiLoading: no; uiError: no; uiScanning: no;"
           color-space="sRGB"
           renderer="colorManagement: true, physicallyCorrectLights"
           vr-mode-ui="enabled: false"
@@ -157,19 +187,31 @@
       listaAlvos.forEach((alvo) => {
         const entityEl = document.getElementById(`target-entity-${alvo.id}`);
         const videoEl = document.getElementById(`vid-alvo-${alvo.id}`);
+        const planeEl = document.getElementById(`plane-alvo-${alvo.id}`);
+        const btnSom = document.getElementById('btn-som');
+
+        // Ajusta largura/altura automaticamente assim que o vídeo carrega as dimensões
+        videoEl.addEventListener('loadedmetadata', () => ajustarProporcaoVideo(videoEl, planeEl));
+        if (videoEl.readyState >= 1) ajustarProporcaoVideo(videoEl, planeEl);
 
         entityEl.addEventListener('targetFound', () => {
+          ajustarProporcaoVideo(videoEl, planeEl);
+          videoAtivoAtual = videoEl;
+          btnSom.style.display = 'inline-block';
+
           document.getElementById('mira-guia').style.opacity = '0';
           document.getElementById('texto-status-hud').textContent = 'Imagem reconhecida!';
           document.getElementById('dica-rodape').textContent = alvo.cliente ? `Memória de: ${alvo.cliente}` : 'Reproduzindo vídeo...';
 
           videoEl.muted = false;
+          btnSom.textContent = '🔊 Som';
+
           videoEl.play().catch(() => {
             videoEl.muted = true;
+            btnSom.textContent = '🔇 Mudo';
             videoEl.play();
           });
 
-          // Envia contagem silenciosa para a planilha (sem bloquear por CORS)
           if (!contadosNaSessao.has(alvo.id)) {
             contadosNaSessao.add(alvo.id);
             fetch(`${URL_API_CONTADOR}?acao=registrar&id=${alvo.id}`, { mode: 'no-cors' }).catch(() => {});
@@ -177,6 +219,7 @@
         });
 
         entityEl.addEventListener('targetLost', () => {
+          btnSom.style.display = 'none';
           document.getElementById('mira-guia').style.opacity = '1';
           document.getElementById('texto-status-hud').textContent = 'Procurando foto...';
           document.getElementById('dica-rodape').textContent = 'Aponte novamente para a imagem do produto';
