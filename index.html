@@ -83,8 +83,9 @@
   <div id="container-ar" style="width: 100%; height: 100%;"></div>
 
   <script>
-    const URL_API_SHEETS = 'https://script.google.com/macros/s/AKfycbwxt52dx4ObKzXUcxb8Lug0DnuaybRlUv0PELth7Kmj7zlPjbdoNAqcJlk3Myj-UazTVw/exec';
+    const URL_ALVOS_JSON = 'https://filhoadao.github.io/BauerBrindes_midias/alvos.json';
     const URL_TARGETS_MIND = 'https://filhoadao.github.io/BauerBrindes_midias/targets.mind';
+    const URL_API_CONTADOR = 'https://script.google.com/macros/s/AKfycbwxt52dx4ObKzXUcxb8Lug0DnuaybRlUv0PELth7Kmj7zlPjbdoNAqcJlk3Myj-UazTVw/exec';
 
     let listaAlvos = [];
     const contadosNaSessao = new Set();
@@ -94,11 +95,12 @@
       const status = document.getElementById('status-carregamento');
 
       try {
-        const resp = await fetch(`${URL_API_SHEETS}?acao=listar`);
+        const resp = await fetch(`${URL_ALVOS_JSON}?t=${Date.now()}`);
+        if (!resp.ok) throw new Error('Arquivo alvos.json não encontrado.');
         listaAlvos = await resp.json();
 
         if (!listaAlvos || listaAlvos.length === 0) {
-          status.textContent = 'Nenhum produto ativo encontrado na planilha.';
+          status.textContent = 'Nenhum produto ativo encontrado.';
           status.style.color = '#f87171';
           return;
         }
@@ -107,7 +109,7 @@
         btn.textContent = 'Ativar Câmera Mágica';
         status.textContent = `${listaAlvos.length} experiência(s) pronta(s)`;
       } catch (err) {
-        status.textContent = 'Erro ao conectar na planilha: ' + err.message;
+        status.textContent = 'Erro ao carregar catálogo: ' + err.message;
         status.style.color = '#f87171';
       }
     });
@@ -167,9 +169,10 @@
             videoEl.play();
           });
 
+          // Envia contagem silenciosa para a planilha (sem bloquear por CORS)
           if (!contadosNaSessao.has(alvo.id)) {
             contadosNaSessao.add(alvo.id);
-            fetch(`${URL_API_SHEETS}?acao=registrar&id=${alvo.id}`).catch(() => {});
+            fetch(`${URL_API_CONTADOR}?acao=registrar&id=${alvo.id}`, { mode: 'no-cors' }).catch(() => {});
           }
         });
 
